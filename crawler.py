@@ -1,25 +1,19 @@
-
 import praw
-import pandas as pd
-import datetime as dt
 import time
-import argparse
-import sys
 import os
 import requests
 import shutil
-from prawcore.exceptions import Forbidden
 import youtube_dl
-from urllib.error import URLError
 import config
-
+from prawcore.exceptions import Forbidden
+from urllib.error import URLError
 
 def Download(type):
     # finds redditor's top submissions for the type
     for submissionTitle in reddit.redditor("{}".format(redditor)).submissions.top("{}".format(type)):
-        # finds .jpg images from top posts
+        # finds .jpg images from user top posts
         if ".jpg" in "{}".format(submissionTitle.url):
-            print("top", type, "submissions of", submissionTitle.author)
+            print(submissionTitle.author, ": top", type, "submissions of")
             print(submissionTitle.subreddit, ":", submissionTitle.url)
             imgURL = submissionTitle.url
             imgFolder = os.path.join("{}/".format(authorPath), "{}".format(submissionTitle.subreddit))
@@ -49,8 +43,9 @@ def Download(type):
                 else:
                     print('Image Couldn\'t be retreived')
 
+        # finds redgif images from user top posts
         if "redgifs" in "{}".format(submissionTitle.url):
-            print("top", type, "submissions of", submissionTitle.author)
+            print(submissionTitle.author, ": top", type, "submissions of")
             print(submissionTitle.subreddit, ":", submissionTitle.url)
             imgURL = submissionTitle.url
             imgFolder = os.path.join("{}/".format(authorPath), "{}".format(submissionTitle.subreddit))
@@ -63,10 +58,13 @@ def Download(type):
             gifURL = submissionTitle.url
             gifName = gifURL.rsplit('/', 1)
             gifDest = os.path.join(imgFolder, gifName[1])
+            # sets ytdl options
+            # outtmpl sets the file destination, name, and file type
             ytdlOpts = {
             'format': 'bestaudio/best',
             'outtmpl': '{}'.format(gifDest+'.mp4'),
             'quiet': True}
+            # actual ytdl download + exception handling
             with youtube_dl.YoutubeDL(ytdlOpts) as ytdl:
                 try:
                     ytdl.download([submissionTitle.url])
@@ -107,6 +105,6 @@ if __name__ == '__main__':
             for i in range(len(timePeriods)):
                 Download(timePeriods[i])
 
-            time.sleep(5)
+            time.sleep(1)
         except Forbidden:
             print("Forbidden error")
