@@ -8,76 +8,65 @@ import config
 from prawcore.exceptions import Forbidden
 from urllib.error import URLError
 
-def Download(type):
-    # finds redditor's top submissions for the type
-    for submissionTitle in reddit.redditor("{}".format(redditor)).submissions.top("{}".format(type)):
-        # finds .jpg images from user top posts
-        if ".jpg" in "{}".format(submissionTitle.url):
-            print(submissionTitle.author, ": top", type, "submissions of")
-            print(submissionTitle.subreddit, ":", submissionTitle.url)
-            imgURL = submissionTitle.url
-            imgFolder = os.path.join("{}/".format(authorPath), "{}".format(submissionTitle.subreddit))
+# checks if subreddit folder exists and returns submissionTitle's imgURL, fullPathName, and fileName
+def checkFile(fileType,submissionTitle, topType):
+    if fileType in "{}".format(submissionTitle.url):
+        print(submissionTitle.author, ": top", topType, "submissions")
+        print(submissionTitle.subreddit, ":", submissionTitle.url)
+        imgURL = submissionTitle.url
+        imgFolder = os.path.join("{}/".format(authorPath), "{}".format(submissionTitle.subreddit))
+        fileName = imgURL.rsplit('/', 1)
+        fullPathName = os.path.join(imgFolder, fileName[1])
+        # checks if redditor's submission subreddit folder exists
+        if not os.path.exists(imgFolder):
+            print("creating folder", submissionTitle.subreddit)
+            os.makedirs(imgFolder)
+        else: pass
+        return imgURL, fullPathName, fileName[1]
+    else: return None, None, None
 
-            # checks if redditor's submission subreddit folder exists
-            if not os.path.exists(imgFolder):
-                print("creating folder", submissionTitle.subreddit)
-                os.makedirs(imgFolder)
+def Download(topType):
+    # finds redditor's top submissions based on top submission type
+    for submissionTitle in reddit.redditor("{}".format(redditor)).submissions.top("{}".format(topType)):
+        fileType = [".jpg", "redgifs"]
+        for x in range (len(fileType)):
+            imgURL, fullPathName, fileName = checkFile(fileType[x], submissionTitle, topType)
+            if imgURL == None or fullPathName == None: continue
             else:
-                pass
-            # checks if image exists and downloads if file does not exist
-            fileName = imgURL.rsplit('/', 1)[1]
-            fullPathName = imgFolder + '/' + fileName
-            if os.path.exists(fullPathName):
-                print("File already exists")
-            else:
-                filename = submissionTitle.id
-                # opens url image
-                r = requests.get(imgURL, stream = True)
-                # checks if image was retrieved
-                if r.status_code == 200:
-                    r.raw.decode_content == True
-                    # saves image at fullPathName
-                    with open(fullPathName, 'wb') as f:
-                        shutil.copyfileobj(r.raw, f)
-                    print('Image sucessfully Downloaded: ',filename)
-                else:
-                    print('Image Couldn\'t be retreived')
-
-        # finds redgif images from user top posts
-        if "redgifs" in "{}".format(submissionTitle.url):
-            print(submissionTitle.author, ": top", type, "submissions of")
-            print(submissionTitle.subreddit, ":", submissionTitle.url)
-            imgURL = submissionTitle.url
-            imgFolder = os.path.join("{}/".format(authorPath), "{}".format(submissionTitle.subreddit))
-            # checks if redditor's submission subreddit folder exists
-            if not os.path.exists(imgFolder):
-                print("creating folder", submissionTitle.subreddit)
-                os.makedirs(imgFolder)
-            else:
-                pass
-            gifURL = submissionTitle.url
-            gifName = gifURL.rsplit('/', 1)
-            gifDest = os.path.join(imgFolder, gifName[1])
-            # sets ytdl options
-            # outtmpl sets the file destination, name, and file type
-            ytdlOpts = {
-            'format': 'bestaudio/best',
-            'outtmpl': '{}'.format(gifDest+'.mp4'),
-            'quiet': True}
-            # actual ytdl download + exception handling
-            with youtube_dl.YoutubeDL(ytdlOpts) as ytdl:
-                try:
-                    ytdl.download([submissionTitle.url])
-                except ConnectionRefusedError:
-                    print("ConnectionRefusedError")
-                    continue
-                except youtube_dl.utils.DownloadError:
-                    print("youtube_dl.utils.DownloadError")
-                    continue
-                except urllib.error.URLError:
-                    print("urllib.error.URLError")
-                    continue
-
+                if ".jpg" in fileType[x]:
+                    if os.path.exists(fullPathName):
+                        print("File already exists")
+                    else:
+                        # opens url image
+                        r = requests.get(imgURL, stream = True)
+                        # checks if image was retrieved
+                        if r.status_code == 200:
+                            r.raw.decode_content == True
+                            # saves image at fullPathName
+                            with open(fullPathName, 'wb') as f:
+                                shutil.copyfileobj(r.raw, f)
+                            print('Image sucessfully Downloaded: ',fileName)
+                        else:
+                            print('Image Couldn\'t be retreived')
+                if "redgifs" in fileType[x]:
+                    # sets ytdl options; outtmpl sets the file destination, name, and file type
+                    ytdlOpts = {
+                    'format': 'bestaudio/bestaudio',
+                    'outtmpl': '{}'.format(fullPathName+'.mp4'),
+                    'quiet': True}
+                    # actual ytdl download + exception handling
+                    with youtube_dl.YoutubeDL(ytdlOpts) as ytdl:
+                        try:
+                            ytdl.download([imgURL])
+                        except ConnectionRefusedError:
+                            print("ConnectionRefusedError")
+                            continue
+                        except youtube_dl.utils.DownloadError:
+                            print("youtube_dl.utils.DownloadError")
+                            continue
+                        except urllib.error.URLError:
+                            print("urllib.error.URLError")
+                            continue
         time.sleep(.1)
 
 if __name__ == '__main__':
