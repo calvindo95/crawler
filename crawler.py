@@ -11,8 +11,7 @@ from urllib.error import URLError
 # checks if subreddit folder exists and returns submissionTitle's imgURL, fullPathName, and fileName
 def checkFile(fileType,submissionTitle, topType):
     if fileType in "{}".format(submissionTitle.url):
-        print(submissionTitle.author, ": top", topType, "submissions")
-        print(submissionTitle.subreddit, ":", submissionTitle.url)
+        print(submissionTitle.author, ": top", topType, "of", submissionTitle.subreddit, ":", submissionTitle.url)
         imgURL = submissionTitle.url
         imgFolder = os.path.join("{}/".format(authorPath), "{}".format(submissionTitle.subreddit))
         fileName = imgURL.rsplit('/', 1)
@@ -51,22 +50,25 @@ def Download(topType):
                 if "redgifs" in fileType[x]:
                     # sets ytdl options; outtmpl sets the file destination, name, and file type
                     ytdlOpts = {
-                    'format': 'bestaudio/bestaudio',
+                    'format': 'bestaudio/best',
                     'outtmpl': '{}'.format(fullPathName+'.mp4'),
                     'quiet': True}
                     # actual ytdl download + exception handling
-                    with youtube_dl.YoutubeDL(ytdlOpts) as ytdl:
-                        try:
-                            ytdl.download([imgURL])
-                        except ConnectionRefusedError:
-                            print("ConnectionRefusedError")
-                            continue
-                        except youtube_dl.utils.DownloadError:
-                            print("youtube_dl.utils.DownloadError")
-                            continue
-                        except urllib.error.URLError:
-                            print("urllib.error.URLError")
-                            continue
+                    if os.path.exists(fullPathName+'.mp4'):
+                        print("File already exists")
+                    else:
+                        with youtube_dl.YoutubeDL(ytdlOpts) as ytdl:
+                            try:
+                                ytdl.download([imgURL])
+                            except ConnectionRefusedError:
+                                print("ConnectionRefusedError")
+                                continue
+                            except youtube_dl.utils.DownloadError:
+                                print("youtube_dl.utils.DownloadError")
+                                continue
+                            except urllib.error.URLError:
+                                print("urllib.error.URLError")
+                                continue
         time.sleep(.1)
 
 if __name__ == '__main__':
