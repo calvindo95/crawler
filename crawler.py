@@ -5,7 +5,7 @@ import requests
 import shutil
 import youtube_dl
 import config
-from prawcore.exceptions import Forbidden
+from prawcore.exceptions import Forbidden, NotFound
 from urllib.error import URLError
 
 # checks if subreddit folder exists and returns submissionTitle's imgURL, fullPathName, and fileName
@@ -99,3 +99,5 @@ if __name__ == '__main__':
             time.sleep(1)
         except Forbidden:
             print("Forbidden error")
+        except NotFound:
+            print("404 HTTP response")
