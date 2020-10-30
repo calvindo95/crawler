@@ -5,13 +5,14 @@ import requests
 import shutil
 import youtube_dl
 import config
+import multiprocessing
 from prawcore.exceptions import Forbidden, NotFound
 from urllib.error import URLError
 
 # checks if subreddit folder exists and returns submissionTitle's imgURL, fullPathName, and fileName
-def checkFile(fileType,submissionTitle, topType):
+def checkFile(fileType,submissionTitle, topType, authorPath, name):
     if fileType in "{}".format(submissionTitle.url):
-        print(submissionTitle.author, ": top", topType, "of", submissionTitle.subreddit, ":", submissionTitle.url)
+        print(name, submissionTitle.author, ": top", topType, "of", submissionTitle.subreddit, ":", submissionTitle.url)
         imgURL = submissionTitle.url
         imgFolder = os.path.join("{}/".format(authorPath), "{}".format(submissionTitle.subreddit))
         fileName = imgURL.rsplit('/', 1)
@@ -24,12 +25,12 @@ def checkFile(fileType,submissionTitle, topType):
         return imgURL, fullPathName, fileName[1]
     else: return None, None, None
 
-def Download(topType):
+def Download(topType, redditor, authorPath, name):
     # finds redditor's top submissions based on top submission type
     for submissionTitle in reddit.redditor("{}".format(redditor)).submissions.top("{}".format(topType)):
         fileType = [".jpg", "redgifs"]
         for x in range (len(fileType)):
-            imgURL, fullPathName, fileName = checkFile(fileType[x], submissionTitle, topType)
+            imgURL, fullPathName, fileName = checkFile(fileType[x], submissionTitle, topType, authorPath, name)
             if imgURL == None or fullPathName == None: continue
             else:
                 if ".jpg" in fileType[x]:
@@ -71,18 +72,10 @@ def Download(topType):
                                 continue
         time.sleep(.1)
 
-if __name__ == '__main__':
+def StartHot(name):
     subredditURL = config.subredditURL
     subredditName = subredditURL.rsplit('/', 1)[1]
     print("searching for authors in", subredditName)
-
-    reddit = praw.Reddit(client_id=config.client_id, \
-                         client_secret=config.client_secret, \
-                         user_agent=config.user_agent, \
-                         username=config.username, \
-                         password=config.password)
-
-    # finds subreddit's hot authors
     for submission in reddit.subreddit("{}".format(subredditName)).hot(limit=None):
         redditor = submission.author
         try:
@@ -94,10 +87,47 @@ if __name__ == '__main__':
                 pass
             timePeriods = ["hour", "day", "week", "month", "year", "all"]
             for i in range(len(timePeriods)):
-                Download(timePeriods[i])
+                Download(timePeriods[i], redditor, authorPath, name)
 
             time.sleep(1)
         except Forbidden:
             print("Forbidden error")
         except NotFound:
             print("404 HTTP response")
+
+def StartNew(name):
+    subredditURL = config.subredditURL
+    subredditName = subredditURL.rsplit('/', 1)[1]
+    print("searching for authors in", subredditName)
+    for submission in reddit.subreddit("{}".format(subredditName)).new():
+        redditor = submission.author
+        try:
+            # creates author folder
+            authorPath = os.path.join("./user/", "{}".format(submission.author))
+            if os.path.isdir(authorPath) == False:
+                os.makedirs(authorPath)
+            else:
+                pass
+            timePeriods = ["hour", "day", "week", "month", "year", "all"]
+            for i in range(len(timePeriods)):
+                Download(timePeriods[i], redditor, authorPath, name)
+
+            time.sleep(1)
+        except Forbidden:
+            print("Forbidden error")
+        except NotFound:
+            print("404 HTTP response")
+
+if __name__ == '__main__':
+
+    reddit = praw.Reddit(client_id=config.client_id, \
+                         client_secret=config.client_secret, \
+                         user_agent=config.user_agent, \
+                         username=config.username, \
+                         password=config.password)
+
+    p1 = multiprocessing.Process(target=StartHot, name="p1", args=["p1"])
+    p2 = multiprocessing.Process(target=StartNew, name="p2", args=["p2"])
+
+    p1.start()
+    p2.start()
