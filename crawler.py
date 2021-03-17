@@ -62,15 +62,19 @@ def Download(topType, redditor, authorPath, name):
                         with youtube_dl.YoutubeDL(ytdlOpts) as ytdl:
                             try:
                                 ytdl.download([imgURL])
-                            except ConnectionRefusedError:
-                                print("ConnectionRefusedError")
-                                continue
-                            except youtube_dl.utils.DownloadError:
-                                print("youtube_dl.utils.DownloadError")
-                                continue
-                            except urllib.error.URLError:
-                                print("urllib.error.URLError")
-                                continue
+                            except Exception:
+                                print("Error")
+#                            except ConnectionRefusedError:
+#                                print("ConnectionRefusedError")
+#                                continue
+#                                print("youtube_dl.utils.DownloadError exception error, continuing")
+#                                continue
+#                            except urllib.error.URLError:
+#                                print("urllib.error.URLError exception error, continuing")
+#                                continue
+#                            except socket.timeout:
+#                                print("socket.timout exception error, continuing")
+#                                continue
         time.sleep(.1)
 
 def AuthorCheck(name, redditor):
