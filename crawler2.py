@@ -29,7 +29,7 @@ def AuthorCheck(redditor):
     except NotFound:
         print("404 HTTP response")
 
-def FileDownload(fullPathName, author, imgURL, fileName):
+def FileDownload(fullPathName, author, imgURL, fileName, timePeriod):
     if os.path.exists(fullPathName):
         print(f"{author} {fullPathName} already exists")
     else:
@@ -41,7 +41,7 @@ def FileDownload(fullPathName, author, imgURL, fileName):
             # saves image at fullPathName
             with open(fullPathName, 'wb') as f:
                 shutil.copyfileobj(r.raw, f)
-            print(f"Downloaded {author}: {fileName} at {fullPathName} ")
+            print(f"Downloaded {author}: {timePeriod} {fileName} at {fullPathName} ")
         else:
             print('Image Couldn\'t be retreived')
 
@@ -55,9 +55,9 @@ def Download(timePeriod, redditor, authorPath):
             if imgURL == None or fullPathName == None: continue
             else:
                 if ".jpg" in fileType[x]:
-                    FileDownload(fullPathName, author, imgURL, fileName)
+                    FileDownload(fullPathName, author, imgURL, fileName, timePeriod)
                 if ".gifv" in fileType[x]:
-                    FileDownload(fullPathName, author, imgURL, fileName)
+                    FileDownload(fullPathName, author, imgURL, fileName, timePeriod)
                 if "redgifs" in fileType[x]:
                     # sets ytdl options; outtmpl sets the file destination, name, and file type
                     ytdlOpts = {
