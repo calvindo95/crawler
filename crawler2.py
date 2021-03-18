@@ -6,28 +6,94 @@ import shutil
 import youtube_dl
 import config
 import multiprocessing
-from prawcore.exceptions import Forbidden, NotFound
-from urllib.error import URLError
+import argparse
+
+def SortSubmissionType(subredditName, reddit):
+    timePeriods = ["hour", "day", "week", "month", "year", "all"]
+    if const_sortType == 'hot':
+        for submission in reddit.subreddit(f"{subredditName}").hot(limit=None):
+            originalPoster = submission.author
+            authorPath = AuthorCheck(originalPoster)
+            for i in range(len(timePeriods)):
+                Download(timePeriods[i], originalPoster, authorPath)
+    if const_sortType == 'new':
+        for submission in reddit.subreddit(f"{subredditName}").new(limit=None):
+            originalPoster = submission.author
+            authorPath = AuthorCheck(originalPoster)
+            for i in range(len(timePeriods)):
+                Download(timePeriods[i], originalPoster, authorPath)
+    if const_sortType == 'rising':
+        for submission in reddit.subreddit(f"{subredditName}").rising(limit=None):
+            originalPoster = submission.author
+            authorPath = AuthorCheck(originalPoster)
+            for i in range(len(timePeriods)):
+                Download(timePeriods[i], originalPoster, authorPath)
+    if const_sortType == 'controversial':
+        for submission in reddit.subreddit(f"{subredditName}").controversial(limit=None):
+            originalPoster = submission.author
+            authorPath = AuthorCheck(originalPoster)
+            for i in range(len(timePeriods)):
+                Download(timePeriods[i], originalPoster, authorPath)
+    if const_sortType == 'top':
+        for submission in reddit.subreddit(f"{subredditName}").top(limit=None):
+            originalPoster = submission.author
+            authorPath = AuthorCheck(originalPoster)
+            for i in range(len(timePeriods)):
+                Download(timePeriods[i], originalPoster, authorPath)
 
 '''
 Check if author folder exists, creates folder if does not exist
+Returns relative authorPath directory
 '''
-def AuthorCheck(redditor):
+def AuthorCheck(originalPoster):
     try:
         # creates author folder
-        authorPath = os.path.join("./user/", "{}".format(redditor))
+        authorPath = os.path.join("./user/", f"{originalPoster}")
         if os.path.isdir(authorPath):
             pass
         else:
             os.makedirs(authorPath)
-        timePeriods = ["hour", "day", "week", "month", "year", "all"]
-        for i in range(len(timePeriods)):
-            Download(timePeriods[i], redditor, authorPath)
-        time.sleep(.1)
-    except Forbidden:
-        print("Forbidden error")
-    except NotFound:
-        print("404 HTTP response")
+        return authorPath
+    except Exception: 
+        print("Error")
+
+def Download(timePeriod, originalPoster, authorPath):
+    # finds redditor's top submissions based on top submission type
+    for submissionTitle in reddit.redditor(f"{originalPoster}").submissions.top(f"{timePeriod}"):
+        fileType = [".jpg", "redgifs", "gifv"]
+        for x in range (len(fileType)):
+            imgURL, fullPathName, fileName = CheckFile(fileType[x], submissionTitle, timePeriod, authorPath)
+            author = submissionTitle.author
+            if imgURL == None or fullPathName == None: continue
+            elif ".jpg" in fileType[x]:
+                FileDownload(fullPathName, author, imgURL, fileName, timePeriod)
+            elif ".gifv" in fileType[x]:
+                FileDownload(fullPathName, author, imgURL, fileName, timePeriod)
+            elif "redgifs" in fileType[x]:
+                    # sets ytdl options; outtmpl sets the file destination, name, and file type
+                    ytdlOpts = {
+                    'format': 'bestaudio/best',
+                    'outtmpl': f'{fullPathName}.mp4',
+                    'quiet': True}
+                    # actual ytdl download + exception handling
+                    if os.path.exists(fullPathName+'.mp4'):
+                        print(f"{submissionTitle.author} {fullPathName} already exists")
+                    else:
+                        with youtube_dl.YoutubeDL(ytdlOpts) as ytdl:
+                            try:
+                                ytdl.download([imgURL])
+                            except Exception:
+                                print("Error")
+            else: pass
+
+def CheckFile(fileType,submissionTitle, timePeriod, authorPath):
+    if fileType in f"{submissionTitle.url}":
+        imgURL = submissionTitle.url
+        fileName = imgURL.rsplit('/', 1)
+        fullPathName = os.path.join(authorPath, f"{submissionTitle.author}-{fileName[1]}")
+        # checks if redditor's submission subreddit folder exists
+        return imgURL, fullPathName, fileName[1]
+    else: return None, None, None
 
 def FileDownload(fullPathName, author, imgURL, fileName, timePeriod):
     if os.path.exists(fullPathName):
@@ -45,44 +111,10 @@ def FileDownload(fullPathName, author, imgURL, fileName, timePeriod):
         else:
             print('Image Couldn\'t be retreived')
 
-def Download(timePeriod, redditor, authorPath):
-    # finds redditor's top submissions based on top submission type
-    for submissionTitle in reddit.redditor("{}".format(redditor)).submissions.top("{}".format(timePeriod)):
-        fileType = [".jpg", "redgifs", "gifv"]
-        for x in range (len(fileType)):
-            imgURL, fullPathName, fileName = CheckFile(fileType[x], submissionTitle, timePeriod, authorPath)
-            author = submissionTitle.author
-            if imgURL == None or fullPathName == None: continue
-            else:
-                if ".jpg" in fileType[x]:
-                    FileDownload(fullPathName, author, imgURL, fileName, timePeriod)
-                if ".gifv" in fileType[x]:
-                    FileDownload(fullPathName, author, imgURL, fileName, timePeriod)
-                if "redgifs" in fileType[x]:
-                    # sets ytdl options; outtmpl sets the file destination, name, and file type
-                    ytdlOpts = {
-                    'format': 'bestaudio/best',
-                    'outtmpl': '{}'.format(fullPathName+'.mp4'),
-                    'quiet': True}
-                    # actual ytdl download + exception handling
-                    if os.path.exists(fullPathName+'.mp4'):
-                        print(f"{submissionTitle.author} {fullPathName} already exists")
-                    else:
-                        with youtube_dl.YoutubeDL(ytdlOpts) as ytdl:
-                            try:
-                                ytdl.download([imgURL])
-                            except Exception:
-                                print("Error")
-
-def CheckFile(fileType,submissionTitle, timePeriod, authorPath):
-    if fileType in "{}".format(submissionTitle.url):
-        imgURL = submissionTitle.url
-        fileName = imgURL.rsplit('/', 1)
-        fullPathName = os.path.join(authorPath, f"{submissionTitle.author}-"+fileName[1])
-#        print(submissionTitle.author, ": top", timePeriod, "of", submissionSubreddit, ":", imgURL)
-        # checks if redditor's submission subreddit folder exists
-        return imgURL, fullPathName, fileName[1]
-    else: return None, None, None
+parser = argparse.ArgumentParser()
+parser.add_argument("sortType", nargs='?', help="Sort by 'hot', 'new', 'rising', 'controversial', 'top'; default='hot'", default='hot')
+args = parser.parse_args()
+const_sortType = args.sortType
 
 if __name__ == "__main__":
     reddit = praw.Reddit(client_id=config.client_id, \
@@ -90,11 +122,7 @@ if __name__ == "__main__":
                          user_agent=config.user_agent, \
                          username=config.username, \
                          password=config.password)
-
     subredditName = config.subredditURL.rsplit('/', 1)[1]
-    print("searching for authors in", subredditName)
-    for submission in reddit.subreddit("{}".format(subredditName)).hot(limit=None):
-        redditor = submission.author
-        AuthorCheck(redditor)
-
+    print(f"searching for {args.sortType} authors in {subredditName}")
+    SortSubmissionType(subredditName, reddit)
    
