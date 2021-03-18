@@ -58,6 +58,32 @@ def AuthorCheck(originalPoster):
         print("Error")
 
 def Download(timePeriod, originalPoster, authorPath):
+    for submissionTitle in reddit.redditor(f"{originalPoster}").submissions.new():
+        fileType = [".jpg", "redgifs", "gifv"]
+        for x in range (len(fileType)):
+            imgURL, fullPathName, fileName = CheckFile(fileType[x], submissionTitle, timePeriod, authorPath)
+            author = submissionTitle.author
+            if imgURL == None or fullPathName == None: continue
+            elif ".jpg" in fileType[x]:
+                FileDownload(fullPathName, author, imgURL, fileName, timePeriod)
+            elif ".gifv" in fileType[x]:
+                FileDownload(fullPathName, author, imgURL, fileName, timePeriod)
+            elif "redgifs" in fileType[x]:
+                    # sets ytdl options; outtmpl sets the file destination, name, and file type
+                    ytdlOpts = {
+                    'format': 'bestaudio/best',
+                    'outtmpl': f'{fullPathName}.mp4',
+                    'quiet': True}
+                    # actual ytdl download + exception handling
+                    if os.path.exists(fullPathName+'.mp4'):
+                        print(f"{submissionTitle.author} {fullPathName} already exists")
+                    else:
+                        with youtube_dl.YoutubeDL(ytdlOpts) as ytdl:
+                            try:
+                                ytdl.download([imgURL])
+                            except Exception:
+                                print("Error")
+            else: pass
     # finds redditor's top submissions based on top submission type
     for submissionTitle in reddit.redditor(f"{originalPoster}").submissions.top(f"{timePeriod}"):
         fileType = [".jpg", "redgifs", "gifv"]
@@ -86,6 +112,9 @@ def Download(timePeriod, originalPoster, authorPath):
                                 print("Error")
             else: pass
 
+def AuthorSubmissions():
+    pass
+
 def CheckFile(fileType,submissionTitle, timePeriod, authorPath):
     if fileType in f"{submissionTitle.url}":
         imgURL = submissionTitle.url
@@ -99,17 +128,20 @@ def FileDownload(fullPathName, author, imgURL, fileName, timePeriod):
     if os.path.exists(fullPathName):
         print(f"{author} {fullPathName} already exists")
     else:
-        # opens url image
-        r = requests.get(imgURL, stream = True)
-        # checks if image was retrieved
-        if r.status_code == 200:
-            r.raw.decode_content == True
-            # saves image at fullPathName
-            with open(fullPathName, 'wb') as f:
-                shutil.copyfileobj(r.raw, f)
-            print(f"Downloaded {author}: {timePeriod} {fileName} at {fullPathName} ")
-        else:
-            print('Image Couldn\'t be retreived')
+        try:
+            # opens url image
+            r = requests.get(imgURL, stream = True)
+            # checks if image was retrieved
+            if r.status_code == 200:
+                r.raw.decode_content == True
+                # saves image at fullPathName
+                with open(fullPathName, 'wb') as f:
+                    shutil.copyfileobj(r.raw, f)
+                print(f"Downloaded {author}: {timePeriod} {fileName} at {fullPathName} ")
+            else:
+                print('Image Couldn\'t be retreived')
+        except Exception as e:
+            print(e)
 
 parser = argparse.ArgumentParser()
 parser.add_argument("sortType", nargs='?', help="Sort by 'hot', 'new', 'rising', 'controversial', 'top'; default='hot'", default='hot')
