@@ -5,131 +5,82 @@ import requests
 import shutil
 import youtube_dl
 import config
-import multiprocessing
 import argparse
 
-def SortSubmissionType(subredditName, reddit):
-    timePeriods = ["hour", "day", "week", "month", "year", "all"]
-    if const_sortType == 'hot':
-        for submission in reddit.subreddit(subredditName).hot(limit=None):
-            originalPoster = submission.author
-            authorPath = AuthorCheck(originalPoster)
-            for i in range(len(timePeriods)):
-                Download(timePeriods[i], originalPoster, authorPath)
-                time.sleep(.1)
-    if const_sortType == 'new':
-        for submission in reddit.subreddit(subredditName).new(limit=None):
-            originalPoster = submission.author
-            authorPath = AuthorCheck(originalPoster)
-            for i in range(len(timePeriods)):
-                Download(timePeriods[i], originalPoster, authorPath)
-                time.sleep(.1)
-    if const_sortType == 'rising':
-        for submission in reddit.subreddit(subredditName).rising(limit=None):
-            originalPoster = submission.author
-            authorPath = AuthorCheck(originalPoster)
-            for i in range(len(timePeriods)):
-                Download(timePeriods[i], originalPoster, authorPath)
-                time.sleep(.1)
-    if const_sortType == 'controversial':
-        for submission in reddit.subreddit(subredditName).controversial(limit=None):
-            originalPoster = submission.author
-            authorPath = AuthorCheck(originalPoster)
-            for i in range(len(timePeriods)):
-                Download(timePeriods[i], originalPoster, authorPath)
-                time.sleep(.1)
-    if const_sortType == 'top':
-        for submission in reddit.subreddit(subredditName).top(limit=None):
-            originalPoster = submission.author
-            authorPath = AuthorCheck(originalPoster)
-            for i in range(len(timePeriods)):
-                Download(timePeriods[i], originalPoster, authorPath)
-                time.sleep(.1)
-                
-'''
-Check if author folder exists, creates folder if does not exist
-Returns relative authorPath directory
-'''
-def AuthorCheck(originalPoster):
+# Checks if OP account directory exists; creates account directory if directory does not exist
+def Check_opAccount_Directory(account_Directory):
+    if os.path.isdir(account_Directory): pass
+    else: os.mkdir(account_Directory)
+
+# Crawls through subreddit poster's account
+def Crawl_opAccount(opAccount, my_Reddit, timePeriod):
     try:
-        # creates author folder
-        authorPath = os.path.join("./user/", f"{originalPoster}")
-        if os.path.isdir(authorPath):
-            pass
+        for submissionTitle in my_Reddit.redditor(f"{opAccount}").submissions.new():
+            Search_Sumbissions(opAccount, submissionTitle)
+        for submissionTitle in my_Reddit.redditor(f"{opAccount}").submissions.top(timePeriod):
+            Search_Sumbissions(opAccount, submissionTitle)
+    except Exception as e: print(e)
+
+# Searches for submissions from poster
+def Search_Sumbissions(opAccount, submissionTitle):
+    fileTypes = [".jpg", "redgifs"]
+    submissionURL = submissionTitle.url
+    fileName = submissionURL.rsplit("/", 1)[1]
+    filePath = os.path.join(account_Directory, f"{opAccount}-{fileName}")
+    for i in range(len(fileTypes)):
+        if fileTypes[i] in submissionURL:
+            DownloadFile(filePath, fileTypes[i], submissionURL, opAccount)
+        else: pass
+
+# downloads images and videos
+def DownloadFile(filePath, fileType, submissionURL, opAccount):
+    if os.path.exists(filePath):
+        print(f"{opAccount} {filePath} already exists")
+    elif os.path.exists(filePath+'.mp4'):
+        print(f"{opAccount} {filePath}.mp4 already exists")
+    elif fileType == ".jpg":
+        r = requests.get(submissionURL, stream=True)
+        if r.status_code == 200:
+            with open(filePath, 'wb') as f:
+                shutil.copyfileobj(r.raw, f)
+            print(f"{opAccount} {filePath} downloaded successfully")
         else:
-            os.makedirs(authorPath)
-        return authorPath
-    except Exception: 
-        print("Error")
-
-def Download(timePeriod, originalPoster, authorPath):
-    for submissionTitle in reddit.redditor(f"{originalPoster}").submissions.new():
-        AuthorSubmissions(submissionTitle, authorPath, timePeriod)
-    # finds redditor's top submissions based on top submission type
-    for submissionTitle in reddit.redditor(f"{originalPoster}").submissions.top(timePeriod):
-        AuthorSubmissions(submissionTitle, authorPath, timePeriod)
-
-def AuthorSubmissions(submissionTitle, authorPath, timePeriod):
-    fileTypes = [".jpg", "redgifs", "gifv"]
-    for x in range (len(fileTypes)):
-        author = submissionTitle.author
-        if fileTypes[x] in submissionTitle.url:
-            imgURL = submissionTitle.url
-            fileName = imgURL.rsplit('/', 1)
-            finalfileName = f"{submissionTitle.author}-{fileName[1]}"
-            fullPathName = os.path.join(authorPath, finalfileName)
-            if imgURL == None or fullPathName == None: continue
-            else:
-                FileDownload(fullPathName, author, imgURL, finalfileName, timePeriod, fileTypes[x], submissionTitle)
-
-def FileDownload(fullPathName, author, imgURL, finalfileName, timePeriod, fileType, submissionTitle):
-    if fileType == ".jpg" or fileType == ".gifv":
-        if os.path.exists(fullPathName):
-            print(f"{author} {fullPathName} already exists")
-        else:
-            try:
-                # opens url image
-                r = requests.get(imgURL, stream = True)
-                # checks if image was retrieved
-                if r.status_code == 200:
-                    r.raw.decode_content == True
-                    # saves image at fullPathName
-                    with open(fullPathName, 'wb') as f:
-                        shutil.copyfileobj(r.raw, f)
-                    print(f"Downloaded {author}: {timePeriod} {finalfileName} to {fullPathName} ")
-                else:
-                    print('Image Couldn\'t be retreived')
-            except Exception as e:
-                print(e)
+            print(f"{opAccount} {filePath} failed to download")
     elif fileType == "redgifs":
         # sets ytdl options; outtmpl sets the file destination, name, and file type
-        ytdlOpts = {
-        'format': 'bestaudio/best',
-        'outtmpl': f'{fullPathName}.mp4',
-        'quiet': True}
+        ytdlOpts = {'format': 'bestaudio/best', 'outtmpl': f'{filePath}.mp4', 'quiet': True}
         # actual ytdl download + exception handling
-        if os.path.exists(fullPathName+'.mp4'):
-            print(f"{submissionTitle.author} {fullPathName} already exists")
-        else:
-            with youtube_dl.YoutubeDL(ytdlOpts) as ytdl:
-                try:
-                    ytdl.download([imgURL])
-                except Exception:
-                    print("Error")
-    else: pass
+        with youtube_dl.YoutubeDL(ytdlOpts) as ytdl:
+            try:
+                ytdl.download([submissionURL])
+                print(f"{opAccount} {filePath}.mp4 downloaded successfully")
+            except Exception:
+                print(f"{opAccount} {filePath}.mp4 failed to download")
 
 parser = argparse.ArgumentParser()
-parser.add_argument("sortType", nargs='?', help="Sort by 'hot', 'new', 'rising', 'controversial', 'top'; default='hot'", default='hot')
+parser.add_argument("sortType", nargs='?', help="Sort by 'hot', 'new', 'rising', 'controversial', 'top'; default='hot'", \
+    default='hot')
 args = parser.parse_args()
 const_sortType = args.sortType
-
-if __name__ == "__main__":
-    reddit = praw.Reddit(client_id=config.client_id, \
+my_Reddit = praw.Reddit(client_id=config.client_id, \
                          client_secret=config.client_secret, \
                          user_agent=config.user_agent, \
                          username=config.username, \
                          password=config.password)
+
+if __name__ == "__main__":
     subredditName = config.subredditURL.rsplit('/', 1)[1]
     print(f"searching for {args.sortType} authors in {subredditName}")
-    SortSubmissionType(subredditName, reddit)
-   
+    timePeriods = ["hour", "day", "week", "month", "year", "all"]
+    redditDictofMethods = {'hot':my_Reddit.subreddit(subredditName).hot(limit=None),        # dictionary of reddit methods
+    'new':my_Reddit.subreddit(subredditName).new(limit=None), 
+    'rising':my_Reddit.subreddit(subredditName).rising(limit=None), 
+    'controversial':my_Reddit.subreddit(subredditName).controversial(limit=None),
+    'top':my_Reddit.subreddit(subredditName).top(limit=None)}
+    for i in range(len(timePeriods)):
+        for const_sortType in redditDictofMethods:
+            for submission in redditDictofMethods[const_sortType]:
+                opAccount = submission.author
+                account_Directory = os.path.join("./user/", f"{opAccount}")
+                Check_opAccount_Directory(account_Directory)
+                Crawl_opAccount(opAccount, my_Reddit, timePeriods[i])
