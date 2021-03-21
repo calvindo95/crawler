@@ -1,11 +1,10 @@
 import praw
-import time
 import os
 import requests
 import shutil
-import youtube_dl
 import config
 import argparse
+import bs4
 
 # Checks if OP account directory exists; creates account directory if directory does not exist
 def Check_opAccount_Directory(account_Directory):
@@ -47,15 +46,18 @@ def DownloadFile(filePath, fileType, submissionURL, opAccount):
         else:
             print(f"{opAccount} {filePath} failed to download")
     elif fileType == "redgifs":
-        # sets ytdl options; outtmpl sets the file destination, name, and file type
-        ytdlOpts = {'format': 'bestaudio/best', 'outtmpl': f'{filePath}.mp4', 'quiet': True}
-        # actual ytdl download + exception handling
-        with youtube_dl.YoutubeDL(ytdlOpts) as ytdl:
-            try:
-                ytdl.download([submissionURL])
-                print(f"{opAccount} {filePath}.mp4 downloaded successfully")
-            except Exception:
-                print(f"{opAccount} {filePath}.mp4 failed to download")
+        res = requests.get(f'{submissionURL}')
+        res.raise_for_status()
+        exampleSoup = bs4.BeautifulSoup(res.text, 'html.parser')
+        elems = exampleSoup.select('#root source')
+        redgifURL = elems[2].get('src')
+        r = requests.get(redgifURL, stream=True)
+        if r.status_code == 200:
+            with open(filePath+'.mp4', 'wb') as f:
+                shutil.copyfileobj(r.raw, f)
+            print(f"{opAccount} {filePath}.mp4 downloaded successfully")
+        else:
+            print(f"{opAccount} {filePath}.mp4 failed to download")
 
 parser = argparse.ArgumentParser()
 parser.add_argument("sortType", nargs='?', help="Sort by 'hot', 'new', 'rising', 'controversial', 'top'; default='hot'", \
