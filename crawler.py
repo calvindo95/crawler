@@ -5,7 +5,7 @@ import shutil
 import config
 import argparse
 import bs4
-import time
+import threading
 class Author():
     def __init__(self,author):
         self.author = author
@@ -16,7 +16,7 @@ class Author():
         self.filePaths = self.Search_FilePaths()
 
     def Get_Author(self):
-        return self.author
+        return str(self.author)
 
     def Get_AuthorDirectory(self):
         return self.authorDirectory
@@ -34,7 +34,6 @@ class Author():
                         pass
                     else:
                         submissions.append(submissionTitle)
-                    time.sleep(.1)
             except Exception as e:
                 print(f"Get_AuthorSubmissions {e}")
         return submissions
@@ -62,10 +61,9 @@ class Author():
                     res = requests.get(f'{submission.url}')
                     if res.status_code == 200:
                         soupHTML = bs4.BeautifulSoup(res.text, 'html.parser')
-                        elems = soupHTML.select('#root source')
-                        redgifURL = elems[2].get('src')
+                        elems = soupHTML.select('meta[property="og:video"]')
+                        redgifURL = elems[0].get('content')
                         submissionURLs.append(redgifURL)
-                    time.sleep(.1)
                 except Exception as e:
                     print(f"redgif Get_URLs {e}")
         return submissionURLs
@@ -96,6 +94,21 @@ class Author():
                 filePaths.append('')
         return filePaths
 
+def download_file(author, url, file_path):
+    if os.path.exists(file_path):
+        print(f"{author} {file_path} already exists")
+    else:
+        try:
+            r = requests.get(url, stream=True)
+            if r.status_code == 200:
+                with open(file_path, 'wb') as f:
+                    shutil.copyfileobj(r.raw, f)
+                print(f"{author} {file_path} downloaded successfully")
+            else:
+                print(f"{author} {file_path} failed to download")
+        except Exception:
+            print(f"{author} {file_path} failed to download")
+
 parser = argparse.ArgumentParser()
 parser.add_argument("sortType", nargs='?', help="Sort by 'hot', 'new', 'rising', 'controversial', 'top'; default='hot'", \
     default='hot')
@@ -119,7 +132,6 @@ if __name__ == "__main__":
         print(f"Crawling through {submission.author}")
         author = Author(submission.author)
         submissionUrls = author.Get_URLs()
-        submissionFileNames = author.Get_FileNames()
         submissionFilePaths = author.Get_FilePaths()
 
         # Checks of author directory exists
@@ -127,28 +139,23 @@ if __name__ == "__main__":
             pass
         else: os.mkdir(author.Get_AuthorDirectory())
 
+        all_author_links = []
         for i in range(len(submissionUrls)):
-            if os.path.exists(submissionFilePaths[i]):
-                print(f"{author.Get_Author()} {submissionFilePaths[i]} already exists")
-            elif '.jpg' in submissionUrls[i]:
-                try:
-                    r = requests.get(submissionUrls[i], stream=True)
-                    if r.status_code == 200:
-                        with open(submissionFilePaths[i], 'wb') as f:
-                            shutil.copyfileobj(r.raw, f)
-                        print(f"{author.Get_Author()} {submissionFilePaths[i]} downloaded successfully")
-                    else:
-                        print(f"{author.Get_Author()} {submissionFilePaths[i]} failed to download")
-                except Exception:
-                    print(f"{author.Get_Author()} {submissionFilePaths[i]} failed to download")
-            elif '.mp4' in submissionUrls[i]:
-                try:
-                    r = requests.get(submissionUrls[i], stream=True)
-                    if r.status_code == 200:
-                        with open(submissionFilePaths[i], 'wb') as f:
-                            shutil.copyfileobj(r.raw, f)
-                        print(f"{author.Get_Author()} {submissionFilePaths[i]} downloaded successfully")
-                    else:
-                        print(f"{author.Get_Author()} {submissionFilePaths[i]} failed to download")
-                except Exception:
-                    print(f"{author.Get_Author()} {submissionFilePaths[i]} failed to download")
+            author_links = []
+            author_links.append(author.Get_Author())
+            author_links.append(submissionUrls[i])
+            author_links.append(submissionFilePaths[i])
+            all_author_links.append(author_links)
+        
+        n = 4 #number of parallel connections
+        chunks = [all_author_links[i * n:(i + 1) * n] for i in range((len(all_author_links) + n - 1) // n )]
+
+        for chunk in chunks:
+            threads = []
+            for data in chunk:
+                author, url, file_path = data
+                thread = threading.Thread(target=download_file, args=(author, url, file_path))
+                thread.start()
+                threads.append(thread)
+            for thread in threads:
+                thread.join()
