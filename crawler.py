@@ -6,6 +6,8 @@ import config
 import argparse
 import bs4
 import threading
+from datetime import datetime
+
 class Author():
     def __init__(self,author):
         self.author = author
@@ -15,18 +17,12 @@ class Author():
         self.fileNames = self.Search_FileNames()
         self.filePaths = self.Search_FilePaths()
 
-    def Get_Author(self):
-        return str(self.author)
-
-    def Get_AuthorDirectory(self):
-        return self.authorDirectory
-
     # returns a list of all submissions
     def Get_AuthorSubmissions(self):
         submissions = []
-        sortType = [my_Reddit.redditor(f"{self.Get_Author()}").submissions.hot(), 
-                    my_Reddit.redditor(f"{self.Get_Author()}").submissions.new(),
-                    my_Reddit.redditor(f"{self.Get_Author()}").submissions.top()]
+        sortType = [my_Reddit.redditor(f"{self.author}").submissions.hot(), 
+                    my_Reddit.redditor(f"{self.author}").submissions.new(),
+                    my_Reddit.redditor(f"{self.author}").submissions.top()]
         for i in range(len(sortType)):
             try:
                 for submissionTitle in sortType[i]:
@@ -37,15 +33,6 @@ class Author():
             except Exception as e:
                 print(f"Get_AuthorSubmissions {e}")
         return submissions
-
-    def Get_URLs(self):
-        return self.submissionURLs
-
-    def Get_FileNames(self):
-        return self.fileNames
-
-    def Get_FilePaths(self):
-        return self.filePaths
 
     # returns a list of URLS containing '.jpg' 'redgif' and 'gifv'
     def Search_URLs(self):
@@ -65,7 +52,8 @@ class Author():
                         redgifURL = elems[0].get('content')
                         submissionURLs.append(redgifURL)
                 except Exception as e:
-                    print(f"redgif Get_URLs {e}")
+                    print(f"redgif Get_URLs {submission.url}: {e}")
+                    print()
         return submissionURLs
     
     def Search_FileNames(self):
@@ -74,54 +62,56 @@ class Author():
         for i in range(len(submissionURLs)):
             if '.jpg' in submissionURLs[i]:
                 fileName = submissionURLs[i].rsplit("/", 1)[1]
-                fileNames.append(f"{self.Get_Author()}-{fileName}")
+                fileNames.append(f"{self.author}-{fileName}")
             elif '.mp4' in submissionURLs[i]:
                 fileName = submissionURLs[i].rsplit("/", 1)[1]
-                fileNames.append(f"{self.Get_Author()}-{fileName}")
+                fileNames.append(f"{self.author}-{fileName}")
             else:
                 fileNames.append('')
         return fileNames
 
     def Search_FilePaths(self):
-        fileNames = self.Get_FileNames()
+        fileNames = self.fileNames
         filePaths = []
         for i in range(len(fileNames)):
             if '.jpg' in fileNames[i]:
-                filePaths.append(os.path.join(self.Get_AuthorDirectory(), fileNames[i]))
+                filePaths.append(os.path.join(self.authorDirectory, fileNames[i]))
             elif '.mp4' in fileNames[i]:
-                filePaths.append(os.path.join(self.Get_AuthorDirectory(), fileNames[i]))
+                filePaths.append(os.path.join(self.authorDirectory, fileNames[i]))
             else:
                 filePaths.append('')
         return filePaths
 
 def download_file(author, url, file_path):
+    now = datetime.now()
+    dt_string = now.strftime("%d/%m/%Y %H:%M:%S")
     if os.path.exists(file_path):
-        print(f"{author} {file_path} already exists")
+        print(f"{dt_string} {author} {file_path} already exists")
     else:
         try:
             r = requests.get(url, stream=True)
             if r.status_code == 200:
                 with open(file_path, 'wb') as f:
                     shutil.copyfileobj(r.raw, f)
-                print(f"{author} {file_path} downloaded successfully")
+                print(f"{dt_string} {author} {file_path} downloaded successfully")
             else:
-                print(f"{author} {file_path} failed to download")
+                print(f"{dt_string} {author} {file_path} failed to download")
         except Exception:
-            print(f"{author} {file_path} failed to download")
-
-parser = argparse.ArgumentParser()
-parser.add_argument("sortType", nargs='?', help="Sort by 'hot', 'new', 'rising', 'controversial', 'top'; default='hot'", \
-    default='hot')
-args = parser.parse_args()
-const_sortType = args.sortType
-my_Reddit = praw.Reddit(client_id=config.client_id, \
-                         client_secret=config.client_secret, \
-                         user_agent=config.user_agent, \
-                         username=config.username, \
-                         password=config.password)
+            print(f"{dt_string} {author} {file_path} failed to download")
 
 if __name__ == "__main__":
-    subredditName = config.subredditURL.rsplit('/', 1)[1]
+    parser = argparse.ArgumentParser()
+    parser.add_argument("sortType", nargs='?', help="Sort by 'hot', 'new', 'rising', 'controversial', 'top'; default='hot'", \
+    default='hot')
+    args = parser.parse_args()
+    const_sortType = args.sortType
+    my_Reddit = praw.Reddit(client_id=config.client_id, \
+                             client_secret=config.client_secret, \
+                             user_agent=config.user_agent, \
+                             username=config.username, \
+                             password=config.password)
+
+    subredditName = config.subreddit_Name
     print(f"searching for {args.sortType} authors in {subredditName}")
     redditDictofMethods = {'hot':my_Reddit.subreddit(subredditName).hot(limit=None),        # dictionary of reddit methods
                             'new':my_Reddit.subreddit(subredditName).new(limit=None), 
@@ -131,18 +121,18 @@ if __name__ == "__main__":
     for submission in redditDictofMethods[const_sortType]:
         print(f"Crawling through {submission.author}")
         author = Author(submission.author)
-        submissionUrls = author.Get_URLs()
-        submissionFilePaths = author.Get_FilePaths()
+        submissionUrls = author.submissionURLs
+        submissionFilePaths = author.filePaths
 
         # Checks of author directory exists
-        if os.path.exists(author.Get_AuthorDirectory()):
+        if os.path.exists(author.authorDirectory):
             pass
-        else: os.mkdir(author.Get_AuthorDirectory())
+        else: os.mkdir(author.authorDirectory)
 
         all_author_links = []
         for i in range(len(submissionUrls)):
             author_links = []
-            author_links.append(author.Get_Author())
+            author_links.append(author.author)
             author_links.append(submissionUrls[i])
             author_links.append(submissionFilePaths[i])
             all_author_links.append(author_links)
